@@ -98,6 +98,21 @@ class Bottleneck(nn.Module):
         return out
 
 
+# phager: FIX https://discuss.pytorch.org/t/using-nn-function-interpolate-inside-nn-sequential/23588
+class Interpolate(nn.Module):
+    def __init__(self, scale_factor, mode):
+        super(Interpolate, self).__init__()
+        self.interp = nn.functional.interpolate
+        self.scale_factor = scale_factor
+        self.mode = mode
+        
+    def forward(self, x):
+        # FIX: https://github.com/pytorch/pytorch/issues/27376 + simpler but not yet really nice...
+        # issues are actualy batch size and channel interposlation
+        x = self.interp(x, size=[int(self.scale_factor * x.shape[2]), int(self.scale_factor * x.shape[3])], mode=self.mode)
+        #x = self.interp(x, scale_factor=[int(self.scale_factor), int(self.scale_factor)], mode=self.mode)
+        return x
+
 class HighResolutionModule(nn.Module):
     def __init__(self, num_branches, blocks, num_blocks, num_inchannels,
                  num_channels, fuse_method, multi_scale_output=True):
@@ -203,7 +218,8 @@ class HighResolutionModule(nn.Module):
                                 1, 1, 0, bias=False
                             ),
                             nn.BatchNorm2d(num_inchannels[i]),
-                            nn.Upsample(scale_factor=2**(j-i), mode='nearest')
+                            Interpolate(scale_factor=2**(j-i), mode='nearest')
+                            #nn.Upsample(scale_factor=2**(j-i), mode='nearest')
                         )
                     )
                 elif j == i:
